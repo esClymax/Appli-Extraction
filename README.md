@@ -10,15 +10,10 @@ Application Streamlit pour extraire des tableaux de fichiers PDF et les converti
 - Téléchargement individuel ou groupé (ZIP)
 - Interface de suivi en temps réel
 
-## Déploiement
-
-Cette application est prête à être déployée sur :
-- Streamlit Community Cloud
-- Hugging Face Spaces
-- Render
-- Railway
-
 ## Installation locale
+
+Télécharger le dossier .zip et l'extraire
+Taper les commandes suivantes : 
 
 ```bash
 pip install -r requirements.txt
