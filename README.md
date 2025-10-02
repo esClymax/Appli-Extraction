@@ -12,7 +12,7 @@ Application Streamlit pour extraire des tableaux de fichiers PDF et les converti
 
 ## Installation locale
 
-Télécharger le dossier .zip et l'extraire \n
+Télécharger le dossier .zip et l'extraire  
 Taper les commandes suivantes : 
 
 ```bash
