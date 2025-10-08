@@ -28,6 +28,15 @@ MOTS_CLES = [
     "Bordereau A9 n"
 ]
 
+# Colonnes spéciales pour Bordereau A5
+BORDEREAU_A5_COLUMNS = [
+    'UM', 'DUM', 'SDUM', 
+    'Emploi_Lieu_de_travail_Publié_sous_le',
+    'Nombre_demploi_Lieu_de_travail_Date_de_forclusion',
+    'Motif_Position_GF_de_publication',
+    'CERNE_Reference_My_HR'
+]
+
 # Configuration par défaut pour le nettoyage des données
 DEFAULT_CLEANING_RULES = {
     'remove_empty_rows': True,
@@ -53,11 +62,3 @@ STREAMLIT_CONFIG = {
     'layout': 'wide'
 }
 
-# Colonnes spéciales pour Bordereau A5
-BORDEREAU_A5_COLUMNS = [
-    'UM', 'DUM', 'SDUM', 
-    'Emploi_Lieu_de_travail_Publié_sous_le',
-    'Nombre_demploi_Lieu_de_travail_Date_de_forclusion',
-    'Motif_Position_GF_de_publication',
-    'CERNE_Reference_My_HR'
-]

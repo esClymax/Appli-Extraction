@@ -2,14 +2,15 @@
 Interface utilisateur Streamlit
 """
 
-import os
 import streamlit as st
 import pandas as pd
 import io
+import os  # AJOUT MANQUANT
 import zipfile
 from datetime import datetime
 from typing import Dict, Any
 from .utils import OutputCapture, FileNameSanitizer, format_page_ranges
+
 
 
 class StreamlitUI:
@@ -32,6 +33,11 @@ class StreamlitUI:
             st.session_state.total_processed = 0
         if 'total_success' not in st.session_state:
             st.session_state.total_success = 0
+        if 'uploaded_files' not in st.session_state:
+            st.session_state.uploaded_files = None
+        if 'start_processing' not in st.session_state:
+            st.session_state.start_processing = False
+
     
     def render_main_interface(self):
         """Rend l'interface principale"""
@@ -45,6 +51,7 @@ class StreamlitUI:
         
         # Sinon, afficher l'interface d'upload
         self.show_upload_interface()
+
     
     def show_upload_interface(self):
         """Affiche l'interface d'upload et de traitement"""
@@ -77,15 +84,22 @@ class StreamlitUI:
         )
         
         if uploaded_files:
+            # Stocker les fichiers dans le session state
+            st.session_state.uploaded_files = uploaded_files
+            
             self._show_file_info(uploaded_files)
             
             # Bouton de traitement
             if st.button("🚀 Lancer l'extraction de tous les PDF", type="primary"):
-                return uploaded_files
+                # Déclencher le traitement
+                st.session_state.start_processing = True
+                st.rerun()
         else:
             st.info("👆 Veuillez uploader un ou plusieurs fichiers PDF pour commencer")
-        
-        return None
+            # Nettoyer le session state si pas de fichiers
+            if 'uploaded_files' in st.session_state:
+                del st.session_state.uploaded_files
+
     
     def _show_file_info(self, uploaded_files):
         """Affiche les informations des fichiers uploadés"""

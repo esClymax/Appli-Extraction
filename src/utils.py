@@ -256,3 +256,15 @@ def safe_int_conversion(value: Any) -> int:
         return int(value)
     except (ValueError, TypeError):
         return 0
+
+def debug_print(message: str, level: str = "INFO"):
+    """
+    Fonction de debug pour identifier les problèmes
+    
+    Args:
+        message: Message à afficher
+        level: Niveau de log
+    """
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] {level}: {message}")

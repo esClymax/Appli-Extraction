@@ -25,11 +25,14 @@ class PDFExtractorApp:
     
     def run(self):
         """Lance l'application"""
-        # Afficher l'interface principale
-        uploaded_files = self.ui.render_main_interface()
+        self.ui.render_main_interface()
         
-        if uploaded_files:
-            self._process_uploaded_files(uploaded_files)
+        # Vérifier si des fichiers ont été uploadés et si le bouton a été cliqué
+        if 'uploaded_files' in st.session_state and st.session_state.uploaded_files:
+            if st.session_state.get('start_processing', False):
+                # Réinitialiser le flag
+                st.session_state.start_processing = False
+                self._process_uploaded_files(st.session_state.uploaded_files)
     
     def _process_uploaded_files(self, uploaded_files):
         """Traite les fichiers uploadés"""
@@ -80,11 +83,19 @@ class PDFExtractorApp:
                     # Message de succès
                     self.ui.show_success_message(total_success, len(uploaded_files), global_csv_data is not None)
                     
+                    # Nettoyer les fichiers uploadés du session state
+                    if 'uploaded_files' in st.session_state:
+                        del st.session_state.uploaded_files
+                    
                     # Recharger pour afficher les résultats
                     st.rerun()
             
             except Exception as e:
                 self.ui.show_error_message(e)
+                # En cas d'erreur, aussi nettoyer
+                if 'uploaded_files' in st.session_state:
+                    del st.session_state.uploaded_files
+
     
     def _process_single_pdf(self, uploaded_file, temp_dir):
         """Traite un seul PDF"""
