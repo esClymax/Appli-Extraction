@@ -6,8 +6,11 @@ import pdfplumber
 import pandas as pd
 import PyPDF2
 from typing import List, Optional
+
+from src.processors import DataFrameCombiner
 from .utils import PageRangeParser
 from config import BORDEREAU_A5_COLUMNS
+import re
 
 
 class PDFTableExtractor:
@@ -47,25 +50,15 @@ class PDFTableExtractor:
             print(f"      ❌ Erreur PDFPlumber: {e}")
             return []
     
-    def _extract_tables_from_page(self, pdf, page_num: int, pdf_path: str, 
-                                  category_name: str) -> List[pd.DataFrame]:
+    def _extract_tables_from_page(self, pdf, page_num: int, pdf_path: str, category_name: str) -> List[pd.DataFrame]:
         """
         Extrait les tableaux d'une page spécifique
-        
-        Args:
-            pdf: Objet PDF pdfplumber
-            page_num: Numéro de page
-            pdf_path: Chemin du PDF
-            category_name: Nom de la catégorie
-            
-        Returns:
-            Liste des DataFrames de la page
         """
         page = pdf.pages[page_num - 1]
         page_tables = page.extract_tables()
         tables = []
         
-        for table in page_tables:
+        for i, table in enumerate(page_tables):
             if table and len(table) > 1:
                 # Nettoyer les données du tableau
                 cleaned_table = self._clean_table_data(table)
@@ -73,13 +66,19 @@ class PDFTableExtractor:
                 if cleaned_table:
                     df = pd.DataFrame(cleaned_table[1:], columns=cleaned_table[0])
                     
+                    # VALIDATION AJOUTÉE
+                    df = self._validate_dataframe(df, f"page_{page_num}_table_{i}")
+                    
                     # Traitement spécial pour Bordereau A5
                     if category_name == "Bordereau A5 n":
                         df = self._enhance_bordereau_a5(df, pdf_path, page_num)
+                        # Re-valider après enhancement
+                        df = self._validate_dataframe(df, f"page_{page_num}_A5_enhanced")
                     
                     tables.append(df)
         
         return tables
+
     
     def _clean_table_data(self, table: List[List]) -> List[List]:
         """
@@ -144,26 +143,110 @@ class PDFTableExtractor:
         """
         lines = page_text.split('\n')
         metadata = {col: None for col in BORDEREAU_A5_COLUMNS}
+
+        pattern_line1 = r"Emploi : (.*?) Lieu de travail (.*?) Publié sous le n° (.+)"
+        pattern_line3 = r"Motif (.*?) Position (.*?) GF de publication (.+)"
+        pattern_line4 = r"CERNE\s*:\s*(.*?)\s+Référence MyHR\s+(.+)"
         
         for line in lines:
             line = line.strip()
             
+            if not line:
+                continue
+
             if line.startswith('UM :'):
-                metadata['UM'] = line.split('UM :', 1)[1].strip()
+                parts = line.split(' ')
+                if len(parts) >= 3:
+                    metadata["UM_code"] = parts[2].strip()
+                    metadata["UM_char"] = ' '.join(parts[3:]).strip() if len(parts) > 3 else None
+
             elif line.startswith('DUM :'):
-                metadata['DUM'] = line.split('DUM :', 1)[1].strip()
+                parts = line.split(' ')
+                if len(parts) >= 3:
+                    metadata["DUM_code"] = parts[2].strip()
+                    metadata["DUM_char"] = ' '.join(parts[3:]).strip() if len(parts) > 3 else None
+
             elif line.startswith('SDUM :'):
-                metadata['SDUM'] = line.split('SDUM :', 1)[1].strip()
+                parts = line.split(' ')
+                if len(parts) >= 3:
+                    metadata["SDUM_code"] = parts[2].strip()
+                    metadata["SDUM_char"] = ' '.join(parts[3:]).strip() if len(parts) > 3 else None
+
+            elif line.startswith('FSDUM :'):
+                parts = line.split(' ')
+                if len(parts) >= 3:
+                    metadata["FSDUM_code"] = parts[2].strip()
+                    metadata["FSDUM_char"] = ' '.join(parts[3:]).strip() if len(parts) > 3 else None
+
             elif line.startswith('Emploi :'):
-                metadata['Emploi_Lieu_de_travail_Publié_sous_le'] = line
+                match1 = re.search(pattern_line1, line)
+                if match1:
+                    metadata["Emploi"] = match1.group(1).strip()
+                    metadata["Lieu_de_travail"] = match1.group(2).strip()
+                    metadata["Publie_sous_le"] = match1.group(3).strip()
+
             elif line.startswith("Nombre d'emploi(s) "):
-                metadata['Nombre_demploi_Lieu_de_travail_Date_de_forclusion'] = line
+                parts = line.split(' ')
+                if len(parts) >= 3:
+                    Nombre_demploi = parts[2].strip()
+                    if len(parts) > 3:
+                        remaining = ' '.join(parts[3:])
+                        if "Date de forclusion" in remaining:
+                            location_part = remaining.split("Date de forclusion")[0].strip()
+                            date_part = remaining.split("Date de forclusion")[1].strip()
+                            if metadata["Lieu_de_travail"] and location_part:
+                                metadata["Lieu_de_travail"] = metadata["Lieu_de_travail"] + ' ' + location_part
+                            elif location_part:
+                                metadata["Lieu_de_travail"] = location_part
+                            metadata["Date_de_forclusion"] = date_part
+
             elif line.startswith('Motif '):
-                metadata['Motif_Position_GF_de_publication'] = line
+                match3 = re.search(pattern_line3, line)
+                if match3:
+                    metadata["Motif"] = match3.group(1).strip()
+                    metadata["Position"] = match3.group(2).strip()
+                    metadata["GF_de_publication"] = match3.group(3).strip()
+
             elif line.startswith('CERNE :'):
-                metadata['CERNE_Reference_My_HR'] = line.replace('\xa0', '')
+                # Nettoyage des espaces insécables et normalisation des espaces
+                line_clean = line.replace('\xa0', ' ')
+                line_clean = re.sub(r'\s+', ' ', line_clean)
+                match4 = re.search(pattern_line4, line_clean)
+                if match4:
+                    metadata["CERNE"] = match4.group(1).strip()
+                    metadata["Reference_My_HR"] = match4.group(2).strip()
         
         return metadata
+    
+    def _validate_dataframe(self, df: pd.DataFrame, source: str = "unknown") -> pd.DataFrame:
+        """
+        Valide et nettoie un DataFrame pour éviter les problèmes d'index
+        
+        Args:
+            df: DataFrame à valider
+            source: Source du DataFrame pour le debug
+            
+        Returns:
+            DataFrame validé
+        """
+        if df is None or df.empty:
+            return df
+        
+        print(f"    🔍 Validation DataFrame de {source}:")
+        print(f"      Shape: {df.shape}")
+        print(f"      Index unique: {df.index.is_unique}")
+        print(f"      Colonnes dupliquées: {df.columns.duplicated().any()}")
+        
+        # Forcer un index propre
+        df_clean = df.reset_index(drop=True)
+        
+        # Gérer les colonnes dupliquées
+        if df_clean.columns.duplicated().any():
+            print(f"      ⚠️ Renommage des colonnes dupliquées")
+            df_clean.columns = DataFrameCombiner._make_unique_columns(df_clean.columns)
+        
+        return df_clean
+
 
 
 class MultiMethodExtractor:

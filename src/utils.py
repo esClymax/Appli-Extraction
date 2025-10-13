@@ -6,8 +6,9 @@ import re
 import os
 import io
 import sys
-from typing import List, Callable, Any, Tuple
+from typing import List, Callable, Any, Tuple, Dict
 import contextlib
+import pandas as pd
 
 
 class FileNameSanitizer:
@@ -268,3 +269,62 @@ def debug_print(message: str, level: str = "INFO"):
     import datetime
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] {level}: {message}")
+
+class DataFrameDiagnostic:
+    """Utilitaires pour diagnostiquer les problèmes de DataFrame"""
+    
+    @staticmethod
+    def diagnose_concatenation_error(dataframes_list: List[pd.DataFrame]) -> Dict[str, Any]:
+        """
+        Diagnostique les problèmes potentiels avant concaténation
+        
+        Args:
+            dataframes_list: Liste des DataFrames à analyser
+            
+        Returns:
+            Rapport de diagnostic
+        """
+        report = {
+            'total_dataframes': len(dataframes_list),
+            'empty_dataframes': 0,
+            'duplicate_indexes': [],
+            'duplicate_columns': [],
+            'column_mismatches': [],
+            'recommendations': []
+        }
+        
+        for i, df in enumerate(dataframes_list):
+            if df is None or df.empty:
+                report['empty_dataframes'] += 1
+                continue
+            
+            # Vérifier les index
+            if not df.index.is_unique:
+                report['duplicate_indexes'].append(i)
+            
+            # Vérifier les colonnes
+            if df.columns.duplicated().any():
+                report['duplicate_columns'].append(i)
+        
+        # Générer des recommandations
+        if report['duplicate_indexes']:
+            report['recommendations'].append("Réinitialiser les index avec reset_index(drop=True)")
+        
+        if report['duplicate_columns']:
+            report['recommendations'].append("Renommer les colonnes dupliquées")
+        
+        return report
+    
+    @staticmethod
+    def print_diagnosis(report: Dict[str, Any]):
+        """Affiche le rapport de diagnostic"""
+        print("🔍 DIAGNOSTIC DES DATAFRAMES:")
+        print(f"   Total DataFrames: {report['total_dataframes']}")
+        print(f"   DataFrames vides: {report['empty_dataframes']}")
+        print(f"   Index dupliqués: {report['duplicate_indexes']}")
+        print(f"   Colonnes dupliquées: {report['duplicate_columns']}")
+        
+        if report['recommendations']:
+            print("💡 RECOMMANDATIONS:")
+            for rec in report['recommendations']:
+                print(f"   - {rec}")

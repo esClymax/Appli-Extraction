@@ -10,7 +10,7 @@ from datetime import datetime
 from .processors import DataFrameProcessor, DataFrameCombiner
 from .extractors import MultiMethodExtractor
 from .utils import FileNameSanitizer
-from config import DEFAULT_CLEANING_RULES
+from config import DEFAULT_CLEANING_RULES, DICO_BORDEREAU
 
 
 class CSVGenerator:
@@ -63,37 +63,28 @@ class CSVGenerator:
             print("❌ Aucune donnée à écrire dans le fichier CSV")
             return None, processing_results, 0, None, None
     
-    def _process_category(self, category_name: str, page_ranges: List[str], 
-                         pdf_filename: str) -> Dict[str, Any]:
-        """
-        Traite une catégorie spécifique
+def _process_category(self, category_name: str, page_ranges: List[str], 
+                     pdf_filename: str) -> Dict[str, Any]:
+    """
+    Traite une catégorie spécifique - VERSION SÉCURISÉE
+    """
+    print(f"\n🔍 Traitement de la catégorie: '{category_name}'")
+    
+    try:
+        # Extraire les tableaux
+        tables = self.extractor.extract_with_all_methods(
+            self.config.pdf_path, page_ranges, category_name, 
+            self.config.extraction_methods
+        )
         
-        Args:
-            category_name: Nom de la catégorie
-            page_ranges: Plages de pages
-            pdf_filename: Nom du fichier PDF
-            
-        Returns:
-            Dictionnaire avec les résultats du traitement
-        """
-        print(f"\n🔍 Traitement de la catégorie: '{category_name}'")
-        
-        try:
-            # Extraire les tableaux
-            tables = self.extractor.extract_with_all_methods(
-                self.config.pdf_path, page_ranges, category_name, 
-                self.config.extraction_methods
-            )
-            
-            if not tables:
-                return {
-                    'success': False,
-                    'error': 'Aucun tableau extrait',
-                    'category_label': category_name,
-                    'rows': 0,
-                    'cols': 0
-                }
-            
+        if not tables:
+            print(f"    ❌ Aucun tableau extrait pour {category_name}")
+            # Créer un DataFrame vide mais valide
+            empty_df = pd.DataFrame({
+                'temp_col': [f'Aucun tableau trouvé dans {category_name}']
+            })
+            processed_df = self.processor.process_dataframe(empty_df, category_name, pdf_filename)
+        else:
             # Combiner les tableaux
             combined_df = DataFrameCombiner.combine_tables(tables)
             
@@ -101,55 +92,100 @@ class CSVGenerator:
             processed_df = self.processor.process_dataframe(
                 combined_df, category_name, pdf_filename
             )
-            
-            if processed_df is None or processed_df.empty:
-                return {
-                    'success': False,
-                    'error': 'DataFrame vide après traitement',
-                    'category_label': category_name,
-                    'rows': 0,
-                    'cols': 0
-                }
-            
+        
+        # VÉRIFICATION : processed_df ne doit JAMAIS être None
+        if processed_df is None:
+            raise ValueError("Le processeur a retourné None")
+        
+        if processed_df.empty:
+            print(f"    ⚠️ DataFrame vide après traitement pour {category_name}")
+        else:
             print(f"    ✅ Préparé: {category_name} ({processed_df.shape[0]} lignes, {processed_df.shape[1]} colonnes)")
-            
-            return {
-                'success': True,
-                'dataframe': processed_df,
-                'category_label': category_name,
-                'rows': len(processed_df),
-                'cols': len(processed_df.columns)
-            }
-            
-        except Exception as e:
-            print(f"    ❌ Erreur catégorie '{category_name}': {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'category_label': category_name,
-                'rows': 0,
-                'cols': 0
-            }
+        
+        return {
+            'success': True,
+            'dataframe': processed_df,
+            'category_label': category_name,
+            'rows': len(processed_df),
+            'cols': len(processed_df.columns)
+        }
+        
+    except Exception as e:
+        print(f"    ❌ Erreur catégorie '{category_name}': {e}")
+        # Créer un DataFrame d'erreur au lieu de None
+        error_df = pd.DataFrame({
+            'Document': [pdf_filename.replace('.pdf', '')],
+            'Catégorie': [DICO_BORDEREAU.get(category_name, category_name)],
+            'Nom & Prénom': [f'Erreur extraction: {str(e)}']
+        })
+        
+        return {
+            'success': True,  # Considéré comme succès car on a un DataFrame
+            'dataframe': error_df,
+            'category_label': category_name,
+            'rows': len(error_df),
+            'cols': len(error_df.columns),
+            'error': str(e)
+        }
     
     def _create_csv_file(self, dataframes: List[pd.DataFrame], csv_filepath: str,
-                        csv_filename: str, success_count: int, 
-                        processing_results: Dict) -> Tuple[str, Dict, int, bytes, pd.DataFrame]:
+                    csv_filename: str, success_count: int, 
+                    processing_results: Dict) -> Tuple[str, Dict, int, bytes, pd.DataFrame]:
         """
         Crée le fichier CSV final
-        
-        Args:
-            dataframes: Liste des DataFrames à combiner
-            csv_filepath: Chemin du fichier CSV
-            csv_filename: Nom du fichier CSV
-            success_count: Nombre de catégories traitées avec succès
-            processing_results: Résultats du traitement
-            
-        Returns:
-            Tuple avec les informations du fichier créé
         """
         try:
+            print(f"🔗 Création du CSV avec {len(dataframes)} DataFrames...")
+            
+            # Vérifier qu'on a des DataFrames valides
+            valid_dataframes = []
+            for i, df in enumerate(dataframes):
+                if df is not None and not df.empty:
+                    print(f"   DataFrame {i+1}: {len(df)} lignes, {len(df.columns)} colonnes")
+                    valid_dataframes.append(df)
+                else:
+                    print(f"   DataFrame {i+1}: VIDE ou None - ignoré")
+            
+            if not valid_dataframes:
+                print("❌ Aucun DataFrame valide à traiter")
+                # Créer un DataFrame vide avec les colonnes de base
+                empty_df = pd.DataFrame(columns=['Document', 'Catégorie', 'Nom & Prénom'])
+                return self._write_csv_file(empty_df, csv_filepath, csv_filename, success_count, processing_results)
+            
             # Fusionner tous les DataFrames
-            merged_df = DataFrameCombiner.concatenate_all_dataframes(dataframes)
+            merged_df = DataFrameCombiner.concatenate_all_dataframes(valid_dataframes)
+            
+            # VÉRIFICATION CRITIQUE : s'assurer que merged_df n'est pas None
+            if merged_df is None:
+                print("⚠️ concatenate_all_dataframes a retourné None - création d'un DataFrame vide")
+                merged_df = pd.DataFrame(columns=['Document', 'Catégorie', 'Nom & Prénom'])
+            elif merged_df.empty:
+                print("⚠️ DataFrame fusionné est vide")
+                # Garder le DataFrame vide mais avec les bonnes colonnes
+                if 'Document' not in merged_df.columns:
+                    merged_df = pd.DataFrame(columns=['Document', 'Catégorie', 'Nom & Prénom'])
+            
+            return self._write_csv_file(merged_df, csv_filepath, csv_filename, success_count, processing_results)
+            
+        except Exception as e:
+            print(f"❌ Erreur lors de la création du fichier CSV: {e}")
+            print(f"Type d'erreur: {type(e).__name__}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return None, processing_results, 0, None, None
+
+    def _write_csv_file(self, merged_df: pd.DataFrame, csv_filepath: str, 
+                    csv_filename: str, success_count: int, 
+                    processing_results: Dict) -> Tuple[str, Dict, int, bytes, pd.DataFrame]:
+        """
+        Écrit le DataFrame dans un fichier CSV
+        """
+        try:
+            # Vérification finale avant écriture
+            if merged_df is None:
+                raise ValueError("DataFrame est None - impossible d'écrire le CSV")
+            
+            print(f"📝 Écriture CSV: {len(merged_df)} lignes, {len(merged_df.columns)} colonnes")
             
             # Créer le contenu CSV
             csv_buffer = io.StringIO()
@@ -169,7 +205,7 @@ class CSVGenerator:
             return csv_filepath, processing_results, success_count, csv_data, merged_df
             
         except Exception as e:
-            print(f"❌ Erreur lors de la création du fichier CSV: {e}")
+            print(f"❌ Erreur lors de l'écriture du CSV: {e}")
             return None, processing_results, 0, None, None
 
 

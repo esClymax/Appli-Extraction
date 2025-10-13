@@ -2,6 +2,16 @@
 Configuration de l'extracteur PDF
 """
 
+# Mode debug pour diagnostiquer les problèmes
+DEBUG_MODE = True  # Mettre à False en production
+
+# Configuration de logging
+LOGGING_CONFIG = {
+    'show_dataframe_info': True,
+    'show_concatenation_details': True,
+    'validate_indexes': True
+}
+
 # Dictionnaire des bordereaux avec leurs libellés
 DICO_BORDEREAU = {
     "Bordereau A1 n": "Admissions au stage statutaire",
@@ -30,11 +40,10 @@ MOTS_CLES = [
 
 # Colonnes spéciales pour Bordereau A5
 BORDEREAU_A5_COLUMNS = [
-    'UM', 'DUM', 'SDUM', 
-    'Emploi_Lieu_de_travail_Publié_sous_le',
-    'Nombre_demploi_Lieu_de_travail_Date_de_forclusion',
-    'Motif_Position_GF_de_publication',
-    'CERNE_Reference_My_HR'
+    "UM_code", "UM_char", "DUM_code", "DUM_char", "SDUM_code", "SDUM_char",
+    "FSDUM_code", "FSDUM_char", "Emploi", "Lieu_de_travail", "Publie_sous_le",
+    "Nombre_demploi", "Date_de_forclusion", "Motif", "Position",
+    "GF_de_publication", "CERNE", "Reference_My_HR"
 ]
 
 # Configuration par défaut pour le nettoyage des données
