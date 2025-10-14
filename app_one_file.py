@@ -201,8 +201,8 @@ class PDFPlumberExtractor:
                                         CERNE = Reference_My_HR = None
 
                                         # Patterns regex
-                                        pattern_ligne1 = r"Emploi : (.*?) Lieu de travail (.*?) Publié sous le n° (.+)"
-                                        pattern_ligne3 = r"Motif (.*?) Position (.*?) GF de publication (.+)"
+                                        pattern_ligne1 = r"Emploi :(.*?)Lieu de travail(.*?)Publié sous le n°(.+)"
+                                        pattern_ligne3 = r"Motif(.*?)Position(.*?)GF de publication(.+)"
                                         pattern_ligne4 = r"CERNE\s*:\s*(.*?)\s+Référence MyHR\s+(.+)"
                                         
                                         for ligne in lignes:
@@ -426,15 +426,20 @@ class DictionaryCSVProcessor:
                 if True in mask_unnamed:
                     new_cols = []
                     compte = 0
+                    consec = 0
+                    left_name = ""
                     for i, c in enumerate(df.columns):
                         if mask_unnamed[i]:
+                            consec += 1
                             compte += 1
-                            left_name = new_cols[i-1] if i > 0 else "col0"
-                            first_val = df.iloc[0, i] if len(df) > 0 else ""
-                            left_first_val = df.iloc[0, i-1] if len(df) > 0 else ""
-                            new_cols[i-1] = f"{left_name}_{str(left_first_val).strip()}"
+                            if consec == 1:
+                                left_name = new_cols[i-1] if i > 0 else "col0"
+                                left_first_val = df.iloc[0, i-1] 
+                                new_cols[i-1] = f"{left_name}_{str(left_first_val).strip()}"
+                            first_val = df.iloc[0, i] 
                             new_cols.append(f"{left_name}_{str(first_val).strip()}")
                         else:
+                            consec = 0
                             new_cols.append(str(c))
                 
                     if compte > 0:
