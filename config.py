@@ -1,18 +1,8 @@
 """
-Configuration de l'extracteur PDF
+Configuration et constantes de l'application
 """
 
-# Mode debug pour diagnostiquer les problèmes
-DEBUG_MODE = True  # Mettre à False en production
-
-# Configuration de logging
-LOGGING_CONFIG = {
-    'show_dataframe_info': True,
-    'show_concatenation_details': True,
-    'validate_indexes': True
-}
-
-# Dictionnaire des bordereaux avec leurs libellés
+# Dictionnaire des bordereaux
 DICO_BORDEREAU = {
     "Bordereau A1 n": "Admissions au stage statutaire",
     "Bordereau I2 n": "Suivis au stage statutaire",
@@ -29,45 +19,25 @@ DICO_BORDEREAU = {
     "Bordereau A9 n": "Requêtes individuelles"
 }
 
-# Mots-clés à rechercher dans les PDF
+# Mots-clés pour l'extraction
 MOTS_CLES = [
-    "Bordereau A1 n", "Bordereau I2 n", "Bordereau A3 n",
-    "Bordereau A4 n", "Bordereau A5 n", "Bordereau A50 n",
-    "Bordereau A6 n", "Bordereau A6 bis n", "Bordereau A7 n",
-    "Bordereau A7 bis n", "Bordereau A7 ter n", "Bordereau I8 n",
+    "Bordereau A1 n", "Bordereau I2 n", "Bordereau A3 n", 
+    "Bordereau A4 n", "Bordereau A5 n", "Bordereau A50 n", 
+    "Bordereau A6 n", "Bordereau A6 bis n", "Bordereau A7 n", 
+    "Bordereau A7 bis n", "Bordereau A7 ter n", "Bordereau I8 n", 
     "Bordereau A9 n"
 ]
 
-# Colonnes spéciales pour Bordereau A5
-BORDEREAU_A5_COLUMNS = [
-    "UM_code", "UM_char", "DUM_code", "DUM_char", "SDUM_code", "SDUM_char",
-    "FSDUM_code", "FSDUM_char", "Emploi", "Lieu_de_travail", "Publie_sous_le",
-    "Nombre_demploi", "Date_de_forclusion", "Motif", "Position",
-    "GF_de_publication", "CERNE", "Reference_My_HR"
-]
+# Configuration Streamlit
+STREAMLIT_CONFIG = {
+    "page_title": "Extracteur Multi-PDF vers CSV Global",
+    "page_icon": "📊",
+    "layout": "wide"
+}
 
-# Configuration par défaut pour le nettoyage des données
+# Configuration par défaut pour l'extraction
 DEFAULT_CLEANING_RULES = {
     'remove_empty_rows': True,
     'remove_empty_columns': True,
     'strip_whitespace': True,
 }
-
-# Patterns pour identifier les colonnes de noms
-NAME_COLUMN_PATTERNS = [
-    r'nom.*pr[eé]nom',
-    r'pr[eé]nom.*nom',
-    r'^nom$',
-    r'nom',
-    r'pr[eé]nom',
-    r'identit[eé]',
-    r'personne'
-]
-
-# Configuration Streamlit
-STREAMLIT_CONFIG = {
-    'page_title': 'Extracteur Multi-PDF vers CSV Global',
-    'page_icon': '📊',
-    'layout': 'wide'
-}
-
